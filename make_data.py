@@ -4,7 +4,7 @@ Stands in for the producer – the application or pipeline that writes the data.
 """
 import duckdb
 
-STATUSES = ["placed", "shipped", "delivered", "canceled"]
+STATUSES = ["placed", "shipped", "delivered", "cancelled"]
 
 con = duckdb.connect("shop.duckdb")
 con.execute("CREATE SCHEMA IF NOT EXISTS sales")
