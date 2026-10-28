@@ -2,7 +2,7 @@ apiVersion: v3.2.0
 kind: DataContract
 id: sales-orders
 name: Sales orders
-version: 1.0.0
+version: 2.0.0
 status: active
 domain: sales
 tags: [orders, sales]
@@ -61,15 +61,6 @@ schema:
               pattern: '^O-[0-9]{6}$'
             mustBe: 0
             dimension: conformity
-      - name: customer_id
-        logicalType: string
-        physicalType: VARCHAR
-        required: true
-        classification: restricted
-        description: Pseudonymous customer ID.
-        relationships:
-          - type: foreignKey
-            to: customers.customer_id
       - name: order_ts
         logicalType: timestamp
         physicalType: TIMESTAMP
