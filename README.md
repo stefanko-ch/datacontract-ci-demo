@@ -8,8 +8,8 @@ A minimal example of a data contract in CI: an [ODCS](https://bitol-io.github.io
 2. **breaking** – does the contract change break consumers (compared with the base branch)?
 3. **test** – does the data that `make_data.py` produces keep the contract?
 
-Written for the blog post
-[Open Data Contract Standard: writing down what your data promises](https://www.stefanko.ch/p/open-data-contract-standard-hands-on/).
+Written for the article
+[Open Data Contract Standard: writing down what your data promises](https://medium.com/@stefanko-ch/open-data-contract-standard-writing-down-what-your-data-promises-c037fabe235a).
 The two open pull requests are the two stories from the post: [#1](https://github.com/stefanko-ch/datacontract-ci-demo/pull/1) changes the data, [#2](https://github.com/stefanko-ch/datacontract-ci-demo/pull/2)
 changes the contract – both turn CI red.
 
