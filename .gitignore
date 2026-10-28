@@ -1,0 +1,6 @@
+shop.duckdb
+shop.duckdb.wal
+base.odcs.yaml
+.venv/
+__marimo__/
+before.odcs.yaml

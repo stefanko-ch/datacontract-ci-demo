@@ -1,0 +1,34 @@
+name: Data contract
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@v10.3.0
+
+      - name: Install the datacontract CLI and DuckDB (versions from uv.lock)
+        run: uv sync --locked
+
+      - name: Lint – is the contract valid ODCS?
+        run: uv run datacontract lint orders.odcs.yaml
+
+      - name: Breaking – does the change break consumers?
+        if: github.event_name == 'pull_request'
+        run: |
+          git show "origin/${{ github.base_ref }}:orders.odcs.yaml" > base.odcs.yaml
+          uv run datacontract breaking base.odcs.yaml orders.odcs.yaml
+
+      - name: Produce the data
+        run: uv run python make_data.py
+
+      - name: Test – does the data keep the contract?
+        run: uv run datacontract ci orders.odcs.yaml

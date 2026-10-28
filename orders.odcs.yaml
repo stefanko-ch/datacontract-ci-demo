@@ -1,0 +1,222 @@
+apiVersion: v3.2.0
+kind: DataContract
+id: sales-orders
+name: Sales orders
+version: 1.0.0
+status: active
+domain: sales
+tags: [orders, sales]
+
+description:
+  purpose: >
+    All orders of the web shop with their order lines, one row per order and one row per line.
+  usage: >
+    Revenue reporting, order status dashboards, input for the customer analytics models.
+  limitations: >
+    Amounts in CHF incl. VAT. Customer IDs are pseudonymous – do not join them with personal data
+    outside the CRM. Orders appear up to 15 minutes after checkout.
+
+context:
+  instructions: >
+    Use this contract for questions about orders, revenue and order status. Revenue is the sum of
+    orders.total_chf; exclude orders with status canceled unless the question asks for them.
+  verifiedStatements:
+    - id: revenue-last-30-days
+      question: What was the revenue in the last 30 days?
+      answer: >
+        SELECT SUM(total_chf) FROM sales.orders
+        WHERE status <> 'canceled' AND order_ts >= now() - INTERVAL 30 DAY
+  constraints:
+    - id: no-customer-identification
+      constraint: Do not try to identify customers or join customer_id with personal data.
+      tags: [privacy]
+
+schema:
+  - name: orders
+    physicalName: orders
+    description: One row per order.
+    quality:
+      - id: orders_fresh
+        description: The newest order is at most one day old.
+        type: sql
+        query: SELECT epoch(now()) - epoch(MAX(order_ts)) FROM orders
+        mustBeLessThan: 86400
+        dimension: timeliness
+        severity: error
+        businessImpact: Dashboards show yesterday's numbers as today's.
+    properties:
+      - name: order_id
+        businessName: order number
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        primaryKey: true
+        criticalDataElement: true
+        examples: [O-000123]
+        quality:
+          - id: order_id_format
+            description: Order numbers look like O-000123.
+            metric: invalidValues
+            arguments:
+              pattern: '^O-[0-9]{6}$'
+            mustBe: 0
+            dimension: conformity
+      - name: customer_id
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        classification: restricted
+        description: Pseudonymous customer ID.
+        relationships:
+          - type: foreignKey
+            to: customers.customer_id
+      - name: order_ts
+        logicalType: timestamp
+        physicalType: TIMESTAMP
+        required: true
+        description: Time of checkout (UTC).
+      - name: status
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        criticalDataElement: true
+        quality:
+          - id: status_known
+            description: Only the four states of the order process.
+            metric: invalidValues
+            arguments:
+              validValues: [placed, shipped, delivered, canceled]
+            mustBe: 0
+            dimension: conformity
+            severity: error
+            businessImpact: Status dashboards show unknown states, filters miss orders.
+      - name: total_chf
+        logicalType: number
+        physicalType: DOUBLE
+        required: true
+        criticalDataElement: true
+        description: Order total in CHF incl. VAT.
+        quality:
+          - id: total_positive
+            description: No zero or negative order totals.
+            type: sql
+            query: SELECT COUNT(*) FROM orders WHERE total_chf <= 0
+            mustBe: 0
+            dimension: accuracy
+
+  - name: order_items
+    physicalName: order_items
+    description: One row per order line.
+    quality:
+      - id: order_item_key_unique
+        description: One row per order and line number.
+        metric: duplicateValues
+        mustBe: 0
+        arguments:
+          properties: [order_id, line_no]
+        dimension: uniqueness
+      - id: order_items_have_order
+        description: Every line belongs to an existing order.
+        type: sql
+        query: SELECT COUNT(*) FROM order_items i LEFT JOIN orders o USING (order_id) WHERE o.order_id IS NULL
+        mustBe: 0
+        dimension: consistency
+    properties:
+      - name: order_id
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        relationships:
+          - type: foreignKey
+            to: orders.order_id
+      - name: line_no
+        logicalType: integer
+        physicalType: BIGINT
+        required: true
+      - name: sku
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        relationships:
+          - type: foreignKey
+            to: products.sku
+      - name: quantity
+        logicalType: integer
+        physicalType: INTEGER
+        required: true
+
+  - name: customers
+    physicalName: customers
+    description: One row per customer, without personal data.
+    properties:
+      - name: customer_id
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        primaryKey: true
+        classification: restricted
+        description: Pseudonymous customer ID.
+      - name: segment
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        quality:
+          - id: segment_known
+            metric: invalidValues
+            arguments:
+              validValues: [private, business]
+            mustBe: 0
+            dimension: conformity
+      - name: country
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        description: ISO country code of the delivery address.
+      - name: customer_since
+        logicalType: date
+        physicalType: DATE
+        required: true
+
+  - name: products
+    physicalName: products
+    description: One row per product in the shop.
+    properties:
+      - name: sku
+        businessName: article number
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        primaryKey: true
+      - name: category
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - name: price_chf
+        logicalType: number
+        physicalType: DOUBLE
+        required: true
+        description: List price in CHF incl. VAT.
+
+servers:
+  - server: local
+    type: duckdb
+    database: shop.duckdb
+    schema: sales
+
+slaProperties:
+  - property: latency
+    value: 15
+    unit: m
+    description: Orders appear at most 15 minutes after checkout.
+  - property: retention
+    value: 10
+    unit: y
+    description: Orders are kept for ten years.
+
+team:
+  name: sales-data
+  members:
+    - username: shop-team
+      role: owner
+    - username: analytics-team
+      role: consumer

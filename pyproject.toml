@@ -1,0 +1,16 @@
+[project]
+name = "datacontract-ci-demo"
+version = "0.1.0"
+description = "A data contract for a synthetic web shop in DuckDB, checked in CI"
+requires-python = ">=3.11"
+dependencies = [
+    "datacontract-cli[duckdb]==1.2.7",
+    "duckdb",
+]
+
+[dependency-groups]
+# Only for looking at the data and the contract: marimo, and the Data Contract Editor (datacontract edit)
+explore = ["marimo", "polars", "pyarrow", "sqlglot", "datacontract-cli[api]==1.2.7"]
+
+[tool.uv]
+package = false
